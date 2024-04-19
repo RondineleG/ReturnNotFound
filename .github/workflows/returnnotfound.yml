@@ -1,0 +1,35 @@
+﻿name: WebApp Pipeline 🚀
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - dev
+
+env:
+  AZURE_WEBAPP_NAME_WEB: returnnotfound
+  AZURE_WEBAPP_PACKAGE_PATH_WEB: "./publish-web"
+
+jobs:
+  publish-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup .NET Core for Blazor
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.101'
+      - name: Restore dependencies for Blazor Web
+        run: dotnet restore ./ReturnNotFound.sln
+      - name: Build Blazor Web
+        run: dotnet build ./src/ReturnNotFound.Web/ReturnNotFound.Web --configuration Release --no-restore
+      - name: Publish Blazor Web
+        run: dotnet publish ./src/ReturnNotFound.Web/ReturnNotFound.Web --configuration Release --no-build --output '${{ env.AZURE_WEBAPP_PACKAGE_PATH_WEB }}'
+      - name: Deploy Blazor Web
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME_WEB }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_WEB }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH_WEB }}
+             
