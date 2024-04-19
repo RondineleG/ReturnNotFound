@@ -2,7 +2,7 @@ name: Implantar Github Pages
 
 on:
   push:
-    branches: ['main','develop']
+    branches: ['main','dev']
 
 jobs:
   build:
