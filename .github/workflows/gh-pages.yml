@@ -1,29 +1,27 @@
-name: Implantar Github Pages
+name: Deploy to Github Pages
+
 on:
   push:
     branches: ['main','dev']
 
-permissions: 
-  contents: write
-
 jobs:
-  deploy:
-
+  build:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core
+
+    - name: Setup .NET Core SDK
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: '8.0.x'
-    - name: Publish with dotnet
-      run: dotnet publish --configuration Release --output build
-    - name: Change base-tag in index.html from / to ReturnNotFound
-      run: sed -i 's/<base href="\/" \/>/<base href="\/ReturnNotFound\/" \/>/g' build/wwwroot/index.html
-    - name: Commit wwwroot to GitHub Pages
-      uses: JamesIves/github-pages-deploy-action@3.7.1
+    
+    - name: Build Application
+      run: dotnet publish -c Release ./src/ReturnNotFound/ReturnNotFound.csproj
+
+    - name: Deploy
+      uses: peaceiris/actions-gh-pages@v3
       with:
-        GITHUB_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-        BRANCH: gh-pages
-        FOLDER: build/wwwroot
+           github_token: ${{ secrets.PUBLISH_TOKEN }}
+           publish_dir: ./src/ReturnNotFound/bin/Release/net8.0/publish/wwwroot/
+           
