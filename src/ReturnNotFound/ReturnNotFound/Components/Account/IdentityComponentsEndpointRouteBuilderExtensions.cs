@@ -13,6 +13,7 @@ using System.Security.Claims;
 using System.Text.Json;
 
 namespace ReturnNotFound.Components.Account;
+
 internal static class IdentityComponentsEndpointRouteBuilderExtensions
 {
     // These endpoints are required by the Identity Razor components defined in the /Components/Account/Pages directory of this project.

@@ -1,12 +1,18 @@
+using KissLog.AspNetCore;
+using KissLog.CloudListeners.Auth;
+using KissLog.CloudListeners.RequestLogsListener;
+using KissLog.Formatters;
+
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.FluentUI.AspNetCore.Components;
+using Microsoft.Extensions.Logging.Console;
 
-using ReturnNotFound.Client.Pages;
-using ReturnNotFound.Components;
 using ReturnNotFound.Components.Account;
 using ReturnNotFound.Data;
+using ReturnNotFound.LogConfigurations;
+
+using Serilog;
 
 namespace ReturnNotFound;
 
@@ -15,7 +21,49 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        var hostEnvironment = builder.Environment;
 
+        builder
+            .Configuration.SetBasePath(hostEnvironment.ContentRootPath)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddJsonFile(
+                $"appsettings.{hostEnvironment.EnvironmentName}.json",
+                optional: true,
+                reloadOnChange: true
+            )
+            .AddEnvironmentVariables();
+
+        if (hostEnvironment.IsDevelopment())
+        {
+            builder.Configuration.AddUserSecrets<Program>(optional: true);
+        }
+        var loggingSection = builder.Configuration.GetSection("Logging");
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder
+                .AddConfiguration(loggingSection)
+                .AddSimpleConsole()
+                .AddConsoleFormatter<CsvLogFormatterConfiguration, ConsoleFormatterOptions>();
+        });
+
+        var logger = loggerFactory.CreateLogger<Program>();
+        Log.Logger = new LoggerConfiguration().ReadFrom.Configuration(builder.Configuration).CreateLogger();
+        builder.Host.UseSerilog();
+        builder.Services.AddLogging(provider =>
+        {
+            provider
+                .AddKissLog(options =>
+                {
+                    options.Formatter = (FormatterArgs args) =>
+                    {
+                        if (args.Exception == null)
+                            return args.DefaultValue;
+
+                        var exceptionStr = new ExceptionFormatter().Format(args.Exception, args.Logger);
+                        return string.Join(Environment.NewLine, new[] { args.DefaultValue, exceptionStr });
+                    };
+                });
+        });
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents()
             .AddInteractiveWebAssemblyComponents();
@@ -27,10 +75,10 @@ public class Program
         builder.Services.AddScoped<AuthenticationStateProvider, PersistingRevalidatingAuthenticationStateProvider>();
 
         builder.Services.AddAuthentication(options =>
-            {
-                options.DefaultScheme = IdentityConstants.ApplicationScheme;
-                options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
-            })
+        {
+            options.DefaultScheme = IdentityConstants.ApplicationScheme;
+            options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+        })
             .AddIdentityCookies();
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Cadeia de conexão 'DefaultConnection' não encontrada.");
@@ -63,13 +111,22 @@ public class Program
         app.UseStaticFiles();
         app.UseAntiforgery();
 
-        app.MapRazorComponents<App>()
+        app.MapRazorComponents<ReturnNotFound.Components.App>()
             .AddInteractiveServerRenderMode()
             .AddInteractiveWebAssemblyRenderMode()
             .AddAdditionalAssemblies(typeof(Counter).Assembly);
 
         app.MapAdditionalIdentityEndpoints();
-
+        app.UseKissLogMiddleware(options =>
+        {
+            options.Listeners.Add(new RequestLogsApiListener(new Application(
+                builder.Configuration["KissLog.OrganizationId"],
+                builder.Configuration["KissLog.ApplicationId"])
+            )
+            {
+                ApiUrl = builder.Configuration["KissLog.ApiUrl"]
+            });
+        });
         app.Run();
     }
 }
