@@ -102,8 +102,11 @@ public class Program
         }
         else
         {
-            app.UseExceptionHandler("/Error");
-            app.UseHsts();
+            //app.UseExceptionHandler("/Error");
+            //app.UseHsts();
+            app.UseWebAssemblyDebugging();
+            app.UseMigrationsEndPoint();
+            app.UseDeveloperExceptionPage();
         }
 
         app.UseHttpsRedirection();
